@@ -34,9 +34,6 @@ jobs:
           rm -rf extracted
           mkdir extracted
           unzip -q "$ZIP_FILE" -d extracted
-          echo "=== extracted tree (top 3 levels) ==="
-          find extracted -maxdepth 3 | sort
-          echo "=== looking for settings.gradle ==="
           SETTINGS=$(find extracted -maxdepth 4 \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1)
           if [ -z "$SETTINGS" ]; then
             echo "settings.gradle not found!"
@@ -45,6 +42,20 @@ jobs:
           PROJECT_DIR=$(dirname "$SETTINGS")
           echo "PROJECT_DIR=$PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Show QuranMatcher.java
+        shell: bash
+        run: |
+          echo "=== QuranMatcher.java (lines 1-80) ==="
+          sed -n '1,80p' "$PROJECT_DIR/app/src/main/java/com/mumahhis/quran/QuranMatcher.java"
+
+      - name: Patch QuranMatcher.java
+        shell: bash
+        run: |
+          FILE="$PROJECT_DIR/app/src/main/java/com/mumahhis/quran/QuranMatcher.java"
+          sed -i "s/\.replace('', '')/.replace(' ', '')/g" "$FILE"
+          echo "=== After patch, lines 25-40 ==="
+          sed -n '25,40p' "$FILE"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -55,8 +66,6 @@ jobs:
         shell: bash
         run: |
           cd "$PROJECT_DIR"
-          pwd
-          ls -la
           gradle assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
