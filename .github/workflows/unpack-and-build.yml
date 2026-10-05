@@ -25,37 +25,28 @@ jobs:
         shell: bash
         run: |
           ZIP_FILE=$(find . -maxdepth 2 -type f -name "MumahhisQuran-v0.9.0-GitHub.zip" | head -n 1)
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ZIP not found"
-            ls -la
-            exit 1
-          fi
-          echo "Found ZIP: $ZIP_FILE"
+          if [ -z "$ZIP_FILE" ]; then echo "ZIP not found"; exit 1; fi
           rm -rf extracted
           mkdir extracted
           unzip -q "$ZIP_FILE" -d extracted
           SETTINGS=$(find extracted -maxdepth 4 \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1)
-          if [ -z "$SETTINGS" ]; then
-            echo "settings.gradle not found!"
-            exit 1
-          fi
           PROJECT_DIR=$(dirname "$SETTINGS")
-          echo "PROJECT_DIR=$PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Show QuranMatcher.java
-        shell: bash
-        run: |
-          echo "=== QuranMatcher.java (lines 1-80) ==="
-          sed -n '1,80p' "$PROJECT_DIR/app/src/main/java/com/mumahhis/quran/QuranMatcher.java"
-
-      - name: Patch QuranMatcher.java
+      - name: Show line 31 before patch
         shell: bash
         run: |
           FILE="$PROJECT_DIR/app/src/main/java/com/mumahhis/quran/QuranMatcher.java"
-          sed -i "s/\.replace('', '')/.replace(' ', '')/g" "$FILE"
-          echo "=== After patch, lines 25-40 ==="
-          sed -n '25,40p' "$FILE"
+          echo "=== line 31 raw (cat -A shows invisible chars) ==="
+          sed -n '31p' "$FILE" | cat -A
+
+      - name: Patch empty char literals
+        shell: bash
+        run: |
+          FILE="$PROJECT_DIR/app/src/main/java/com/mumahhis/quran/QuranMatcher.java"
+          sed -i "s/''/' '/g" "$FILE"
+          echo "=== line 31 after patch ==="
+          sed -n '31p' "$FILE" | cat -A
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
