@@ -3,55 +3,67 @@ name: Build Mumahhis Quran APK
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Install Android SDK 35
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Find project ZIP
+      - name: Find and extract project
+        shell: bash
         run: |
           ZIP_FILE=$(find . -maxdepth 2 -type f -name "MumahhisQuran-v0.9.0-GitHub.zip" | head -n 1)
           if [ -z "$ZIP_FILE" ]; then
-            echo "MumahhisQuran ZIP was not found."
+            echo "ZIP not found"
+            ls -la
             exit 1
           fi
-          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
-
-      - name: Extract project
-        run: |
+          echo "Found ZIP: $ZIP_FILE"
           rm -rf extracted
           mkdir extracted
           unzip -q "$ZIP_FILE" -d extracted
+          echo "=== extracted tree (top 3 levels) ==="
+          find extracted -maxdepth 3 | sort
+          echo "=== looking for settings.gradle ==="
+          SETTINGS=$(find extracted -maxdepth 4 \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1)
+          if [ -z "$SETTINGS" ]; then
+            echo "settings.gradle not found!"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$SETTINGS")
+          echo "PROJECT_DIR=$PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Install Gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
       - name: Build APK
-        working-directory: extracted/MumahhisQuran
-        run: gradle assembleDebug --no-daemon
+        shell: bash
+        run: |
+          cd "$PROJECT_DIR"
+          pwd
+          ls -la
+          gradle assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: MumahhisQuran-debug-apk
-          path: extracted/MumahhisQuran/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            **/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
